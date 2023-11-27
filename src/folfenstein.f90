@@ -1,9 +1,10 @@
 module folfenstein
 
-    use, intrinsic :: iso_c_binding, only : c_int64_t, c_ptr, c_int, c_int32_t
-    
+    use, intrinsic :: iso_c_binding,   only : c_int64_t, c_ptr, c_int, c_int32_t
+    use, intrinsic :: iso_fortran_env, only : real64
     use sdl2
     
+    use utils
     use video, only : state_t, buffer_t, black, red, green, blue, pink,grey,texture_t
     use vector_class, only : vector
 
@@ -18,42 +19,161 @@ module folfenstein
         module procedure init_hit
     end interface hit_t
 
+    type :: sprite_t
+        real(kind=real64) :: x, y
+        integer :: texture
+    end type sprite_t
+
     type(buffer_t) :: buffer
 
     type(state_t) :: state
+    integer :: spriteOrder(19)
+    real(kind=real64) :: spriteDistance(19)
 
-    integer(kind=c_int), parameter :: SCREEN_WIDTH  = 384
-    integer(kind=c_int), parameter :: SCREEN_HEIGHT = 216
+    integer(kind=c_int), parameter :: SCREEN_WIDTH  = 384*2
+    integer(kind=c_int), parameter :: SCREEN_HEIGHT = 216*2
     integer(kind=c_int32_t), target :: pixels(SCREEN_HEIGHT * SCREEN_WIDTH)
-    integer, parameter :: map_width=32,map_height=24
+    integer, parameter :: map_width=24,map_height=24
     integer, parameter :: mapdata(map_width * map_height) = &
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,&
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
-        1,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
-        1,0,0,3,0,3,0,0,1,1,1,2,1,1,1,1,1,2,1,1,1,2,1,0,0,0,0,0,0,0,0,1,&
-        1,0,0,3,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
-        1,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
-        1,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,1,1,1,&
-        1,0,0,3,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
-        1,0,0,3,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,&
-        1,0,0,3,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
-        1,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,1,1,1,&
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
-        1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,&
-        1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
-        1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,3,1,1,1,1,1,&
-        1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
-        1,0,0,4,0,0,4,2,0,2,2,2,2,2,2,2,2,0,2,4,4,0,0,4,0,0,0,0,0,0,0,1,&
-        1,0,0,4,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,4,0,0,0,0,0,0,0,1,&
-        1,0,0,4,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,4,0,0,0,0,0,0,0,1,&
-        1,0,0,4,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,4,0,0,0,0,0,0,0,1,&
-        1,0,0,4,3,3,4,2,2,2,2,2,2,2,2,2,2,2,2,2,4,3,3,4,0,0,0,0,0,0,0,1,&
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
-        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
-        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ! [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,&
+        ! 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,3,0,3,0,0,1,1,1,2,1,1,1,1,1,2,1,1,1,2,1,0,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,3,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,1,1,1,&
+        ! 1,0,0,3,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,3,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,&
+        ! 1,0,0,3,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,1,1,1,&
+        ! 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,&
+        ! 1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,3,1,1,1,1,1,&
+        ! 1,0,0,0,0,0,0,0,0,3,3,3,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,4,0,0,4,2,0,2,2,2,2,2,2,2,2,0,2,4,4,0,0,4,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,4,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,4,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,4,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,4,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,4,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,4,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,4,3,3,4,2,2,2,2,2,2,2,2,2,2,2,2,2,4,3,3,4,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
+        ! 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,&
+        ! 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        [8,8,8,8,8,8,8,8,8,8,8,4,4,6,4,4,6,4,6,4,4,4,6,4,&
+        8,0,0,0,0,0,0,0,0,0,8,4,0,0,0,0,0,0,0,0,0,0,0,4,&
+        8,0,3,3,0,0,0,0,0,8,8,4,0,0,0,0,0,0,0,0,0,0,0,6,&
+        8,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,&
+        8,0,3,3,0,0,0,0,0,8,8,4,0,0,0,0,0,0,0,0,0,0,0,4,&
+        8,0,0,0,0,0,0,0,0,0,8,4,0,0,0,0,0,6,6,6,0,6,4,6,&
+        8,8,8,8,0,8,8,8,8,8,8,4,4,4,4,4,4,6,0,0,0,0,0,6,&
+        7,7,7,7,0,7,7,7,7,0,8,0,8,0,8,0,8,4,0,4,0,6,0,6,&
+        7,7,0,0,0,0,0,0,7,8,0,8,0,8,0,8,8,6,0,0,0,0,0,6,&
+        7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,6,0,0,0,0,0,4,&
+        7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,6,0,6,0,6,0,6,&
+        7,7,0,0,0,0,0,0,7,8,0,8,0,8,0,8,8,6,4,6,0,6,6,6,&
+        7,7,7,7,0,7,7,7,7,8,8,4,0,6,8,4,8,3,3,3,0,3,3,3,&
+        2,2,2,2,0,2,2,2,2,4,6,4,0,0,6,0,6,3,0,0,0,0,0,3,&
+        2,2,0,0,0,0,0,2,2,4,0,0,0,0,0,0,4,3,0,0,0,0,0,3,&
+        2,0,0,0,0,0,0,0,2,4,0,0,0,0,0,0,4,3,0,0,0,0,0,3,&
+        1,0,0,0,0,0,0,0,1,4,4,4,4,4,6,0,6,3,3,0,0,0,3,3,&
+        2,0,0,0,0,0,0,0,2,2,2,1,2,2,2,6,6,0,0,5,0,5,0,5,&
+        2,2,0,0,0,0,0,2,2,2,0,0,0,2,2,0,5,0,5,0,0,0,5,5,&
+        2,0,0,0,0,0,0,0,2,0,0,0,0,0,2,5,0,5,0,5,0,5,0,5,&
+        1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,&
+        2,0,0,0,0,0,0,0,2,0,0,0,0,0,2,5,0,5,0,5,0,5,0,5,&
+        2,2,0,0,0,0,0,2,2,2,0,0,0,2,2,0,5,0,5,0,0,0,5,5,&
+        2,2,2,2,1,2,2,2,2,2,2,1,2,2,2,5,5,5,5,5,5,5,5,5]
+
     public
 
     contains
+
+    subroutine sortSprites(order, dist, amount)
+
+        integer :: order(:), amount
+        real(kind=real64) :: dist(:)
+
+        type(pair) :: sprites(amount)
+        integer :: i
+
+        do i = 1, amount
+            sprites(i)%first = dist(i)
+            sprites(i)%second = order(i)
+        end do
+
+        call sort_pairs(sprites)
+
+        do i = 0, amount-1
+            dist(i+1) = sprites(amount - i)%first
+            order(i+1) = sprites(amount - i)%second
+        end do
+
+    end subroutine sortSprites
+
+    subroutine render_sprites(sprites, texs)
+        use iso_fortran_env, only : int8
+
+        type(sprite_t) :: sprites(:)
+        type(texture_t) :: texs(:)
+        
+        integer :: i, spriteScreenX, spriteHeight, drawStartY, drawEndY, drawStartX, spriteWidth, drawEndX, stripe
+        integer :: texWidth, texHeight, texX, texY, y, d, p
+        real(kind=real64) :: invDet, spriteX, spriteY, transformX, transformY
+        integer(kind=c_int32_t) :: pixel
+
+        texHeight = texs(1)%height
+        texWidth = texs(1)%width
+
+        do i = 1, size(sprites)
+            spriteOrder(i) = i
+            spriteDistance(i) = ((state%pos%X - sprites(i)%x) * (state%pos%X - sprites(i)%x) +&
+                                 (state%pos%Y - sprites(i)%y) * (state%pos%Y - sprites(i)%y))
+        end do
+
+        call sortSprites(spriteOrder, spriteDistance, 19)
+
+        !$omp parallel do default(private) shared(buffer,state,texs,spriteOrder,sprites,texheight,texwidth)
+        do i = 1, size(sprites)
+            spriteX = sprites(spriteOrder(i))%x - state%pos%X
+            spriteY = sprites(spriteOrder(i))%y - state%pos%Y
+
+            invDet = 1. / (state%plane%X *state%dir%Y - state%dir%X*state%plane%y)
+            transformX = invDet * (state%dir%Y *spriteX - state%dir%X*spriteY)
+            transformY = invDet * (-state%plane%y *spriteX + state%plane%X*spriteY)
+
+            spriteScreenX = int((SCREEN_WIDTH / 2) * (1 + transformX/transformY))
+
+            spriteHeight = abs(int(SCREEN_HEIGHT / (transformY)))
+            drawStartY = -spriteHeight/2 + SCREEN_HEIGHT/2
+            if(drawStartY < 0)drawStartY=0
+            drawEndY = spriteHeight/2 + spriteScreenX
+            if(drawEndY >= SCREEN_HEIGHT)drawEndY= SCREEN_HEIGHT-1
+
+            spriteWidth = abs(int(SCREEN_HEIGHT / transformY))
+            drawStartX = -spriteWidth / 2 + spriteScreenX
+            if(drawStartX < 0)drawStartX = 0
+            drawEndX = spriteWidth/2 + spriteScreenX
+            if(drawEndX >= SCREEN_WIDTH)drawEndX=SCREEN_WIDTH-1
+
+            do stripe = drawStartX, drawEndX-1
+                texX = int(256 * (stripe - (-spriteWidth/2 + spriteScreenX)) * texWidth/spriteWidth)/256
+                if(transformY > 0 .and. stripe > 0 .and. stripe < SCREEN_WIDTH .and. transformY < state%ZBuffer(stripe+1))then
+                    do y = drawStartY, drawEndY
+                        d = y * 256 - SCREEN_HEIGHT * 128 + spriteHeight * 128
+                        texY = (((d * texHeight) / spriteHeight) / 256) 
+
+                        p=min(texWidth * texY + texX, 4096)
+                        pixel = texs(sprites(spriteOrder(i))%texture)%texture_pixels(p)
+                        if(iand(pixel, z"00FFFFFF") /= 0)then
+                        p = 1+(y  * SCREEN_WIDTH) + stripe
+
+                        buffer%pixels(p) = pixel
+                        end if
+                    end do
+                end if
+            end do
+        end do
+    end subroutine render_sprites
 
     type(hit_t) function init_hit()
 
@@ -210,7 +330,7 @@ module folfenstein
 
     subroutine render(texs)
         use iso_fortran_env, only : real64, int8, int64
-        type(texture_t), intent(in) :: texs(4)
+        type(texture_t), intent(in) :: texs(:)
 
         type(vector) :: deltadist, sidedist, pos, dir
         real :: xcam, dperp
@@ -219,11 +339,11 @@ module folfenstein
         integer :: texX, drawEnd, drawStart, lineHeight,i
         type(hit_t) :: hit
         integer(kind=c_int32_t) :: pixel
-        integer(kind=int8) :: r, g, b
 
         texHeight = texs(1)%height
         texWidth = texs(1)%width
-        
+
+        !$omp parallel do default(private) shared(buffer, black,grey, texheight,texwidth,texs,state)
         do x = 0, SCREEN_WIDTH-1
             xcam = (2. * ((x) / real(SCREEN_WIDTH))) - 1.
 
@@ -322,14 +442,11 @@ module folfenstein
             do y = drawStart, drawEnd
                 texY = iand(int(texPos), texHeight-1)
                 texPos = texPos + step
+
                 pixel = texs(hit%val)%texture_pixels((texY) * texWidth + texX+1)
                 if(hit%side == 1) pixel = iand(rshift(pixel, 1),8355711)
                 i = 1+(y  * SCREEN_WIDTH) + x
-                call sdl_get_rgb(pixel, texs(hit%val)%pixel_format, b,g,r)
-                buffer%pixels(i) = sdl_map_rgb(buffer%pixel_format, &
-                                               ichar(transfer(r, 'a')),&
-                                               ichar(transfer(g, 'a')),&
-                                               ichar(transfer(b, 'a')))
+                buffer%pixels(i) = pixel
             end do
 
             ! get line height to draw
@@ -340,8 +457,8 @@ module folfenstein
             call verline(x, 0, y0, black)
             ! call verline(x, y0 ,y1, colour)
             call verline(x, y1, SCREEN_HEIGHT-1, grey)
-
+            state%ZBuffer(x+1) = dperp
         end do
-
+!$omp end parallel do
     end subroutine render
 end module folfenstein

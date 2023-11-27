@@ -1,7 +1,7 @@
 module video
 
     use, intrinsic :: iso_c_binding,   only : c_ptr, c_null_char, c_associated, c_int32_t, c_f_pointer, c_int8_t
-    use, intrinsic :: iso_fortran_env, only: stderr => error_unit
+    use, intrinsic :: iso_fortran_env, only: stderr => error_unit, real64
     
     use sdl2, only : sdl_init, sdl_init_video, sdl_get_error, sdl_create_window,sdl_create_renderer,&
                      SDL_WINDOWPOS_UNDEFINED, SDL_WINDOW_ALLOW_HIGHDPI,SDL_RENDERER_PRESENTVSYNC,&
@@ -18,6 +18,7 @@ module video
     type :: state_t
         type(c_ptr)    :: window, renderer
         type(sdl_rect) :: screen_rect
+        real(kind=real64) :: ZBuffer(384*2)
         logical        :: is_running
         type(vector)   :: pos, dir, plane
     end type state_t
@@ -125,15 +126,15 @@ contains
 
         use iso_fortran_env, only : int8
         
-        character(*),    intent(in) :: filenames(4)
-        type(texture_t), intent(inout) :: texs(4)
+        character(*),    intent(in) :: filenames(:)
+        type(texture_t), intent(inout) :: texs(:)
         type(state_t),   intent(in) :: state
         
         type(sdl_pixel_format) :: fmt
         integer :: i, rc
 
-        do i = 1, 4
-            texs(i)%surface => IMG_Load(filenames(i) // c_null_char)
+        do i = 1, size(texs)
+            texs(i)%surface => IMG_Load(trim(filenames(i)) // c_null_char)
 
             fmt = sdl_alloc_format(SDL_PIXELFORMAT_ABGR8888)
             texs(i)%surface = SDL_Convert_Surface(texs(i)%surface, fmt, 0)
